@@ -73,3 +73,60 @@ const PersonProxy = new Proxy(Person, {
 })
 
 const personProxy = new PersonProxy('Vlad', 30)
+
+//Examples
+//Wrapper
+const withDefaultValue = (target, defaultValue = 0)  =>  new Proxy(target, {
+    get: (obj, prop) => (prop in obj ? obj[prop] : defaultValue)
+})
+
+const position = withDefaultValue({
+    x: 24,
+    y: 42
+}, 0)
+
+// Hidden properties
+const  withHiddenProps = (target, prefix = '_')  => new Proxy(target, {
+    has: (obj, prop) => (prop in obj) && (!prop.startsWith(prefix)),
+    ownKeys: (obj) => Reflect.ownKeys(obj).filter(p => !p.startsWith(prefix)),
+    get: (obj, prop, receiver) => (prop in receiver) ? obj[prop] : void 0
+})
+
+const data = withHiddenProps({
+    name: 'Vasya',
+    age: 99,
+    _uid: '9379992'
+})
+
+// Optimization
+const userData = [
+    { id: 1,  name: 'Ilya', age: 25, job: 'Frontend' },
+    { id: 2,  name: 'Vasya', age: 99, job: 'Undefined' },
+    { id: 3,  name: 'No Name', age: 0, job: 'Hacker' },
+]
+
+const IndexArray = new Proxy(Array, {
+    construct(target, [argArray]) {
+        const index = {}
+        argArray.forEach((value) => index[value.id] = value)
+
+        return new Proxy(new target(...argArray), {
+            get(arr, prop) {
+                switch (prop) {
+                    case 'push': return item => {
+                        index[item.id] = item
+                        arr[prop].call(arr, item)
+                    }
+                    case 'findById': return id => index[id]
+                    default: return arr[prop]
+                }
+            }
+        })
+    }
+})
+
+const users = new IndexArray([
+    { id: 1,  name: 'Ilya', age: 25, job: 'Frontend' },
+    { id: 2,  name: 'Vasya', age: 99, job: 'Undefined' },
+    { id: 3,  name: 'No Name', age: 0, job: 'Hacker' },
+])
